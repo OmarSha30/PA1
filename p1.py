@@ -40,7 +40,19 @@ def dns_query(hostname):
     qclass = b'\x00\x01'
 
     question = qname + qtype + qclass
+
+    # Concatenate header and question to form the complete DNS message
+    dns_message = header + question
+
+    # Convert the binary DNS message to a hexadecimal representation
+    hex_message = dns_message.hex()
+
+    # Return the cleaned hexadecimal message
+    return hex_message.replace(" ", "").replace("\n", "")
+
     pass
+
+print(dns_query("gmu.edu"))
 
 def send_query(dns_query, dns_ip):
     dns_port=53
@@ -60,9 +72,6 @@ def main():
     google_ip = "8.8.8.8"
     hostname = sys.argv[1]
     query = dns_query(hostname)
-
-
-
 
 if __name__=="__main__":
     main()
