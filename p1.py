@@ -5,9 +5,16 @@ import random
 import sys
 import time
 
-
-
 def dns_query(hostname):
+
+    # Validate the hostname format and length
+    if not 1 < len(hostname) <= 253 or ".." in hostname or hostname[-1] == '.' or hostname[0] == '.':
+        raise ValueError("Invalid hostname format")
+
+    labels = hostname.split('.')
+    for label in labels:
+        if not 1 <= len(label) <= 63:
+            raise ValueError(f"Invalid label '{label}' in hostname")
 
     #header
     id=random.randint(0, 65535)
