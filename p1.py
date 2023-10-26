@@ -26,7 +26,7 @@ def dns_query(hostname):
 
     flags = (qr << 15) | (opcode << 11) | (aa << 10) | (tc << 9) | (rd << 8) | (ra << 7) | (z << 4) | rcode
     header = struct.pack("!6H", id, flags, qdcount, ancount, nscount, arcount)
-    
+
 
     #question 
     qname_parts = []
@@ -54,24 +54,35 @@ def dns_query(hostname):
 
 print(dns_query("gmu.edu"))
 
-def send_query(dns_query, dns_ip):
+def send_query(dns_query, dns_ip, dns_port=53, timeout=5):
     dns_port=53
     timeout=5
 
-    pass
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.settimeout(timeout)
+        dns_query.encode()
+        try:
+            sock.sendto(dns_query, (dns_ip, dns_port))
+        except socket.timeout:
+            print("Timeout: DNS query timed out")
+            return
 
 def recieve_response():
     pass
 
-def main():
+def main(): 
     
-    if(len!=2):
-        print("Error: not enought args !!")
-        sys.exit(1)
+    # if(len!=2):
+    #     print("Error: not enough args !!")
+    #     sys.exit(1)
 
     google_ip = "8.8.8.8"
     hostname = sys.argv[1]
     query = dns_query(hostname)
+    send_query(query, google_ip, dns_port=53, timeout=5)
+    recieve_response()
+
+
 
 if __name__=="__main__":
     main()
