@@ -69,12 +69,13 @@ def send_query(dns_query, dns_ip, dns_port=53, timeout=5):
             sock.sendto(dns_query, (dns_ip, dns_port))
             print("Connection Successful....")
             print(dns_query)
+            return sock
         except socket.timeout:
             print("Timeout: DNS query timed out")
             return
 
-def recieve_response():
-    pass
+def recieve_response(sock):
+
 
 def main(): 
     
