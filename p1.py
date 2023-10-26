@@ -57,19 +57,18 @@ def dns_query(hostname):
     # Return the cleaned hexadecimal message
     return hex_message.replace(" ", "").replace("\n", "")
 
-    pass
 
-print(dns_query("gmu.edu"))
+#print(dns_query("gmu.edu"))
 
 def send_query(dns_query, dns_ip, dns_port=53, timeout=5):
-    dns_port=53
-    timeout=5
 
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.settimeout(timeout)
-        dns_query.encode()
+        dns_query = dns_query.encode()
         try:
             sock.sendto(dns_query, (dns_ip, dns_port))
+            print("Connection Successful....")
+            print(dns_query)
         except socket.timeout:
             print("Timeout: DNS query timed out")
             return
