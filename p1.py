@@ -34,7 +34,6 @@ def dns_query(hostname):
     flags = (qr << 15) | (opcode << 11) | (aa << 10) | (tc << 9) | (rd << 8) | (ra << 7) | (z << 4) | rcode
     header = struct.pack("!6H", id, flags, qdcount, ancount, nscount, arcount)
 
-
     #question 
     qname_parts = []
     for i in hostname.split():
@@ -56,7 +55,6 @@ def dns_query(hostname):
 
     # Return the cleaned hexadecimal message
     return hex_message.replace(" ", "").replace("\n", "")
-
 
 #print(dns_query("gmu.edu"))
 
@@ -87,8 +85,6 @@ def main():
     query = dns_query(hostname)
     send_query(query, google_ip, dns_port=53, timeout=5)
     recieve_response()
-
-
 
 if __name__=="__main__":
     main()
