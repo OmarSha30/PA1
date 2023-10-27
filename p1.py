@@ -134,10 +134,12 @@ def receive_response(sock):
             print("answer.TTL:", ttl)
             
             if rtype == 1:  # A record
-                ip_address = socket.inet_ntoa(rdata)
-                print(f"answer.RDATA = {ip_address}  ## resolved IP address ##")
-            else:
-                print("answer.RDATA", rdata)
+                if rdlength==4:
+                    ip_address = socket.inet_ntoa(rdata)
+                    print(f"answer.RDATA = {ip_address}  ## resolved IP address ##")
+                else:
+                    #print("len rdata = ", len(rdata))
+                    print("Invalid IPv4 address!")
 
     except socket.timeout:
         print("Timeout: No response received")
