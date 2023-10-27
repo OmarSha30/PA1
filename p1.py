@@ -123,7 +123,7 @@ def receive_response(sock):
         # Parsing answer section
         for _ in range(ancount):
             name, offset = parse_qname(data, offset)
-            rtype, rclass, ttl, rdlength = struct.unpack('!2HlH', data[offset:offset + 10])
+            rtype, rclass, ttl, rdlength = struct.unpack('!2HLH', data[offset:offset + 10])
             offset += 10
             rdata = data[offset:offset + rdlength]
             offset += rdlength
@@ -132,10 +132,12 @@ def receive_response(sock):
             print("answer.TYPE:", rtype)
             print("answer.CLASS:", rclass)
             print("answer.TTL:", ttl)
-            print("answer.RDATA", rdata)
-            # if rtype == 1:  # A record
-            #     ip_address = socket.inet_ntoa(rdata)
-            #     print(f"IP Address: {ip_address}")
+            
+            if rtype == 1:  # A record
+                ip_address = socket.inet_ntoa(rdata)
+                print(f"answer.RDATA = {ip_address}  ## resolved IP address ##")
+            else:
+                print("answer.RDATA", rdata)
 
     except socket.timeout:
         print("Timeout: No response received")
