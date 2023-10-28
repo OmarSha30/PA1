@@ -1,178 +1,145 @@
+
+
 import socket
 import struct
-import threading
 import random
-import sys
-import time
 
 def dns_query(hostname):
 
-    # Validate the hostname format and length
-    if not 1 < len(hostname) <= 253 or ".." in hostname or hostname[-1] == '.' or hostname[0] == '.':
-        raise ValueError("Invalid hostname format")
-
-    labels = hostname.split('.')
-    for label in labels:
-        if not 1 <= len(label) <= 63:
-            raise ValueError(f"Invalid label '{label}' in hostname")
-
     #header
-    id=random.randint(0, 65535)
-    qr=0
-    opcode=0
-    aa=0
-    tc=0
-    rd=1
-    ra=0
-    z=0
-    rcode=0
-    qdcount=1
-    ancount=0
-    nscount=0
-    arcount=0
-
-    flags = (qr << 15) | (opcode << 11) | (aa << 10) | (tc << 9) | (rd << 8) | (ra << 7) | (z << 4) | rcode
-    header = struct.pack("!6H", id, flags, qdcount, ancount, nscount, arcount)
-
-    #question 
-    qname_parts = []
-    for i in hostname.split('.'):
-        qname_parts.append(bytes([len(i)]) + i.encode())
+    id = random.randint(0, 65535)
+    #flags = 0x0100  # Standard query
     
-    qname_parts.append(b'\x00')
-    qname = b''.join(qname_parts)
+    # Flags
+    QR = 0
+    OPCODE = 0
+    AA = 0
+    TC = 0
+    RD = 1
+    RA = 0
+    Z = 0
+    RCODE = 0
+    flags = (QR << 15) | (OPCODE << 11) | (AA << 10) | (TC << 9) | (RD << 8) | (RA << 7) | (Z << 6) | RCODE
+    QDCOUNT=1
+    ANCOUNT=0
+    NSCOUNT=0
+    ARCOUNT=0
+    
+    
+    # Pack header
+    header = struct.pack("!HHHHHH", id,flags, QDCOUNT, ANCOUNT ,NSCOUNT, ARCOUNT)
 
-    qtype = b'\x00\x01'
-    qclass = b'\x00\x01'
+    # Pack question
+    question = b''
+    for part in hostname.split('.'):
+        question += struct.pack('B', len(part))
+        question += part.encode('utf-8')
+    question += b'\x00'  # End of string
+    question += struct.pack('!HH', 1, 1)  # QTYPE=A, QCLASS=IN
 
-    question = qname + qtype + qclass
+    message = header + question
+    print("Preparing DNS Query...")
+    return message
 
-    # Concatenate header and question to form the complete DNS message
-    dns_message = header + question
+def send_query(message, server='8.8.8.8', port=53, timeout=5, max_retries=3):
+    print("Contacting DNS Server...")
+    print("Sending DNS Query...")
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.settimeout(timeout)
+        for attempt in range(max_retries):
+            try:
+                s.sendto(message, (server, port))
+                data, _  = s.recvfrom(4096)
+                return data, attempt+1  
+            except socket.timeout:
+                print(f"Timeout reached. Retrying {attempt+1}/{max_retries}...")
+        print(f"Error: No response received after {max_retries} attempts.")
+        return None, None 
 
-    # Convert the binary DNS message to a hexadecimal representation
-    hex_message = dns_message.hex()
+def parse_dns_response(response):
+    header = struct.unpack('!HHHHHH', response[:12])
+    (qname, qtype, qclass), question_len = parse_question(response[12:])
+    answers_offset = 12 + question_len
+    answers = []
+    for _ in range(header[3]):
+        answer, len_read = parse_answer(response, answers_offset)
+        answers_offset += len_read
+        answers.append(answer)
+    return header, (qname, qtype, qclass), answers
 
-    # Return the cleaned hexadecimal message
-    return hex_message.replace(" ", "").replace("\n", "")
+def parse_question(response, offset):
+    qname, offset = parse_domain_name(response, offset)
+    qtype, qclass = struct.unpack('!HH', response[offset:offset+4])
+    return qname, qtype, qclass, offset+4
 
-#print(dns_query("gmu.edu"))
+def parse_answer(response, offset):
+    aname, offset = parse_domain_name(response, offset)
+    atype, aclass, attl, rdlength = struct.unpack('!HHIH', response[offset:offset+10])
+    offset += 10
+    if atype == 1:  # A record
+        adata = socket.inet_ntoa(response[offset:offset+rdlength])
+    else:
+        adata,  = parse_domain_name(response, offset)
+    return aname, atype, aclass, attl, adata,rdlength, offset+rdlength
 
-def send_query(dns_query, dns_ip, dns_port=53, timeout=5):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.settimeout(timeout)
-    dns_query = bytes.fromhex(dns_query)
-    print("Preparing DNS query...")
-    print("Contacting DNS server...")
-    print("Sending DNS query...")
-    try:
-        sock.sendto(dns_query, (dns_ip, dns_port))
-        print("Connection Successful....")
-        print(dns_query)
-        return sock
-    except socket.timeout:
-        print("Timeout: DNS query timed out")
-        sock.close()
-        return None
-
-def receive_response(sock):
-    try:
-        data, addr = sock.recvfrom(1024)  # receive up to 1024 bytes
-        print("DNS response received (attempt 1 of 3)")
-        print("Processing DNS response..")
-        print("Received response from:", addr)
-        print("-------------------------------------------")
-
-        # Unpack the header
-        id, flags, qdcount, ancount, nscount, arcount = struct.unpack('!6H', data[:12])
-
-        # Parse flags
-        qr = (flags & 0x8000) >> 15
-        opcode = (flags & 0x7800) >> 11
-        aa = (flags & 0x0400) >> 10
-        tc = (flags & 0x0200) >> 9
-        rd = (flags & 0x0100) >> 8
-        ra = (flags & 0x0080) >> 7
-        z = (flags & 0x0070) >> 4
-        rcode = flags & 0x000F
-
-        print("header.ID:", id)
-        print("header.QR:", qr)
-        print("header.OPCODE:", opcode)
-        print("header.AA:", aa)
-        print("header.TC:", tc)
-        print("header.RD:", rd)
-        print("header.RA:", ra)
-        print("header.Z:", z)
-        print("header.RCODE:", rcode)
-        print("header.QDCOUNT:", qdcount)
-        print("header.ANCOUNT:", ancount)
-        print("header.NSCOUNT:", nscount)
-        print("header.ARCOUNT:", arcount)
-
-        # Parsing the question section
-        offset = 12  # past the header
-        for _ in range(qdcount):
-            qname, offset = parse_qname(data, offset)
-            qtype, qclass = struct.unpack('!2H', data[offset:offset + 4])
-            offset += 4
-            print("question.QNAME:", qname)
-            print("question.QTYPE:", qtype)
-            print("question.QCLASS:", qclass)
-
-        # Parsing answer section
-        for _ in range(ancount):
-            name, offset = parse_qname(data, offset)
-            rtype, rclass, ttl, rdlength = struct.unpack('!2HLH', data[offset:offset + 10])
-            offset += 10
-            rdata = data[offset:offset + rdlength]
-            offset += rdlength
-
-            print("answer.NAME:", name)
-            print("answer.TYPE:", rtype)
-            print("answer.CLASS:", rclass)
-            print("answer.TTL:", ttl)
-            
-            if rtype == 1:  # A record
-                if rdlength==4:
-                    ip_address = socket.inet_ntoa(rdata)
-                    print(f"answer.RDATA = {ip_address}  ## resolved IP address ##")
-                else:
-                    #print("len rdata = ", len(rdata))
-                    print("Invalid IPv4 address!")
-
-    except socket.timeout:
-        print("Timeout: No response received")
-
-def parse_qname(data, offset):
+def parse_domain_name(response, offset):
     labels = []
     while True:
-        length = data[offset]
-        
-        if length == 0:
+        length = response[offset]
+        if (length & 0xC0) == 0xC0:
+            pointer = struct.unpack('!H', response[offset:offset+2])[0] & 0x3FFF
+            labels.append(parse_domain_name(response, pointer)[0])
+            offset += 2
+            break
+        elif length > 0:
+            offset += 1
+            labels.append(response[offset:offset+length].decode())
+            offset += length
+        else:
             offset += 1
             break
-        if length & 0xC0 == 0xC0:
-            offset = struct.unpack('!H', data[offset:offset + 2])[0] & 0x3FFF
-        else:
-            labels.append(data[offset + 1:offset + 1 + length])
-            offset += length + 1
-        
-    return b".".join(labels), offset 
+    return '.'.join(labels), offset
 
-def main(): 
+def parse_dns_response(response):
+    id, flags, qdcount, ancount, nscount, arcount = struct.unpack('!HHHHHH', response[:12])
+    qr = (flags >> 15) & 1
+    opcode = (flags >> 11) & 0xF
+    aa = (flags >> 10) & 1
+    tc = (flags >> 9) & 1
+    rd = (flags >> 8) & 1
+    ra = (flags >> 7) & 1
+    z = (flags >> 4) & 7
+    rcode = flags & 0xF
+
+    print(f"header.ID: {id}")
+    print(f"header.QR:{qr} \nheader.OPCODE:{opcode}\nheader.AA:{aa}\nheader.TC:{tc}\nheader.RD:{rd}\nheader.RA:{ra}\nheader.Z:{z}\nheader.RCODE:{rcode}")
+    print(f"header.QDCOUNT: {qdcount}")
+    print(f"header.ANCOUNT: {ancount}")
+    print(f"header.NSCOUNT: {nscount}")
+    print(f"header.ARCOUNT: {arcount}")
+    print()
+    offset = 12
+    for _ in range(qdcount):
+        qname, qtype, qclass, offset = parse_question(response, offset)
+        print(f"question.QNAME: {qname}\nquestion.QTYPE: {qtype}\nquestion.QCLASS: {qclass}")
+
+    print()
+    # Unpack answers
+    for _ in range(ancount):
+        aname, atype, aclass, attl, adata, rdlength, offset = parse_answer(response, offset)
+        print(f"answer.NAME: {aname}\nanswer.TYPE: {atype}\nanswer.CLASS: {aclass}\nanswer.TTL: {attl}\nanswer.RDLENGTH: {rdlength}\nanswer.RDATA: {adata}")
     
-    # if(len!=2):
-    #     print("Error: not enough args !!")
-    #     sys.exit(1)
 
-    google_ip = "8.8.8.8"
-    hostname = sys.argv[1]
+if __name__ == "__main__":
+    hostname = "gmu.edu"
     query = dns_query(hostname)
-    sock = send_query(query, google_ip, dns_port=53, timeout=5)
-    if sock:
-        receive_response(sock)
-        sock.close()
+    response, attempt = send_query(query)
 
-if __name__=="__main__":
-    main()
+    if response:
+        print(f"DNS response received (attempt {attempt} of 3)")
+        print("Processing DNS response...")
+        print("-------------------------------")
+        parse_dns_response(response)
+    else:
+        print("Failed to receive DNS response.")
+    
