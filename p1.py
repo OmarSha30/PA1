@@ -1,4 +1,5 @@
-
+#Omar Shahin and Huzayfa Sabri
+#P1
 
 import socket
 import struct
@@ -8,7 +9,6 @@ def dns_query(hostname):
 
     #header
     id = random.randint(0, 65535)
-    #flags = 0x0100  # Standard query
     
     # Flags
     QR = 0
