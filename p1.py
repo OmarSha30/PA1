@@ -4,6 +4,7 @@
 import socket
 import struct
 import random
+import sys
 
 def dns_query(hostname):
 
@@ -34,8 +35,8 @@ def dns_query(hostname):
     for part in hostname.split('.'):
         question += struct.pack('B', len(part))
         question += part.encode('utf-8')
-    question += b'\x00'  # End of string
-    question += struct.pack('!HH', 1, 1)  # QTYPE=A, QCLASS=IN
+    question += b'\x00'  
+    question += struct.pack('!HH', 1, 1)  
 
     message = header + question
     print("Preparing DNS Query...")
@@ -131,7 +132,11 @@ def parse_dns_response(response):
     
 
 if __name__ == "__main__":
-    hostname = "gmu.edu"
+    if len(sys.argv) < 2:
+        print("Usage: python script.py <hostname>")
+        sys.exit(1)
+
+    hostname = sys.argv[1]
     query = dns_query(hostname)
     response, attempt = send_query(query)
 
