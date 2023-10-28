@@ -66,6 +66,18 @@ def parse_dns_response(response):
         answer, len_read = parse_answer(response, answers_offset)
         answers_offset += len_read
         answers.append(answer)
+    
+    # Authority Records
+    print("\nAuthority Records:")
+    for _ in range(nscount):
+        aname, atype, aclass, attl, adata, rdlength, offset = parseanswer(response, offset)
+        print(f"authority.NAME: {aname}\nauthority.TYPE: {atype}\nauthority.CLASS: {aclass}\nauthority.TTL: {attl}\nauthority.RDLENGTH: {rdlength}\nauthority.RDATA: {adata}")
+
+    # Additional Records
+    print("\nAdditional Records:")
+    for _ in range(arcount):
+        aname, atype, aclass, attl, adata, rdlength, offset = parse_answer(response, offset)
+        print(f"additional.NAME: {aname}\nadditional.TYPE: {atype}\nadditional.CLASS: {aclass}\nadditional.TTL: {attl}\nadditional.RDLENGTH: {rdlength}\nadditional.RDATA: {adata}")
     return header, (qname, qtype, qclass), answers
 
 def parse_question(response, offset):
